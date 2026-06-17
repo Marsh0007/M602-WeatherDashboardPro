@@ -1,0 +1,23 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+.venv/
+
+# Logs
+src/logs/
+*.log
+
+# Generated Charts
+charts/*.png
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
