@@ -1,4 +1,4 @@
-# WeatherDashboardPro (M602 Python Programming Project)
+# WeatherDashboardPro (M602 Computer Programming Project)
 
 A Python desktop application built using Tkinter and the OpenWeatherMap API.
 
