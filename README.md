@@ -164,4 +164,4 @@ python src/main.py
    * Average Temperature
    * Temperature Spread
 6. Display ranked results.
-7. 
+
