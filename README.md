@@ -105,7 +105,7 @@ WeatherDashboardPro/
 │   ├── charts/
 │   │   └── forecast_temperature_chart.png
 │   │
-│   ├── logs/
+│   ├── logs/ (The Folder folder will created automactically whenever the user creates any error with error log file)
 │   │   └── error.log
 │   │
 │   ├── utils/
