@@ -1,14 +1,19 @@
 import os
+import csv
+
 import tkinter as tk
+import customtkinter as ctk
+
+
 from tkinter import messagebox
 from datetime import datetime
-
+from tkinter import simpledialog
 from weather_service import WeatherService
+from alert_manager import AlertManager
 from file_manager import FileManager
 from city_manager import CityManager
+from city_comparison import CityComparison
 from chart_generator import ChartGenerator
-from rounded_button import RoundedButton
-from theme import *
 
 
 class WeatherDashboardGUI:
@@ -18,325 +23,340 @@ class WeatherDashboardGUI:
         self.file_manager = FileManager()
         self.city_manager = CityManager()
         self.chart_generator = ChartGenerator()
+        self.alert_manager = AlertManager()
+        self.city_comparison = CityComparison()
 
+        self.current_city = None
         self.current_forecast = []
 
-        self.bg_color = BG_COLOR
-        self.card_color = CARD_COLOR
-        self.input_color = INPUT_COLOR
-        self.text_color = TEXT_COLOR
-        self.muted_text = MUTED_TEXT
-        self.accent_color = ACCENT_COLOR
-        self.blue_color = BLUE_COLOR
-        self.green_color = GREEN_COLOR
-        self.red_color = RED_COLOR
+        self.bg_color = "#F7F7F4"
+        self.card_color = "#FFFFFF"
+        self.soft_card = "#F3F1EA"
+        self.alert_bg = "#F7EDDB"
+        self.text_color = "#111827"
+        self.muted_text = "#4B5563"
+        self.border_color = "#D1D5DB"
+        self.blue_color = "#2563EB"
+        self.alert_text = "#7C5A18"
 
-        self.window = tk.Tk()
+        ctk.set_appearance_mode("light")
+
+        self.window = ctk.CTk()
         self.window.title("Weather Dashboard Pro")
-        self.window.geometry("1120x720")
-        self.window.config(bg=self.bg_color)
+        self.window.configure(fg_color=self.bg_color)
+        self.window.geometry("900x820")
         self.window.resizable(False, False)
 
-        self.create_scrollable_layout()
         self.create_widgets()
         self.update_clock()
 
-    def create_scrollable_layout(self):
-        self.canvas = tk.Canvas(
-            self.window,
-            bg=self.bg_color,
-            highlightthickness=0
-        )
-        self.canvas.pack(side="left", fill="both", expand=True)
-
-        self.scrollbar = tk.Scrollbar(
-            self.window,
-            orient="vertical",
-            command=self.canvas.yview
-        )
-        self.scrollbar.pack(side="right", fill="y")
-
-        self.canvas.configure(yscrollcommand=self.scrollbar.set)
-
-        self.main_container = tk.Frame(self.canvas, bg=self.bg_color)
-
-        self.canvas_window = self.canvas.create_window(
-            (0, 0),
-            window=self.main_container,
-            anchor="nw"
-        )
-
-        self.main_container.bind("<Configure>", self.update_scroll_region)
-        self.canvas.bind("<Configure>", self.update_canvas_width)
-        self.window.bind_all("<MouseWheel>", self.on_mousewheel)
-
-    def update_scroll_region(self, event):
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def update_canvas_width(self, event):
-        self.canvas.itemconfig(self.canvas_window, width=event.width)
-
-    def on_mousewheel(self, event):
-        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-    def create_card(self, parent, width, height):
-        card = tk.Frame(
+    def create_card(self, parent, color=None, radius=12):
+        return ctk.CTkFrame(
             parent,
-            bg=self.card_color,
-            padx=22,
-            pady=20,
-            width=width,
-            height=height
+            fg_color=color or self.card_color,
+            corner_radius=radius,
+            border_width=1,
+            border_color=self.border_color
         )
-        card.pack(pady=10)
-        card.pack_propagate(False)
-        return card
-
-    def create_section_title(self, parent, text):
-        tk.Label(
-            parent,
-            text=text,
-            font=SECTION_FONT,
-            bg=self.card_color,
-            fg=self.accent_color
-        ).pack(anchor="w")
 
     def create_widgets(self):
-        title_label = tk.Label(
-            self.main_container,
-            text="🌦 Weather Dashboard Pro",
-            font=TITLE_FONT,
-            bg=self.bg_color,
-            fg=self.text_color
+        self.page = ctk.CTkFrame(
+            self.window,
+            fg_color=self.bg_color,
+            width=800
         )
-        title_label.pack(pady=(20, 3))
+        self.page.pack(pady=25)
 
-        subtitle_label = tk.Label(
-            self.main_container,
-            text="Live weather, forecast, favorites, and temperature history",
-            font=("Arial", 11),
-            bg=self.bg_color,
-            fg=self.muted_text
-        )
-        subtitle_label.pack(pady=(0, 5))
+        header = ctk.CTkFrame(self.page, fg_color=self.bg_color)
+        header.pack(fill="x", pady=(0, 16))
 
-        self.clock_label = tk.Label(
-            self.main_container,
+        ctk.CTkLabel(
+            header,
+            text="☁  Weather Dashboard Pro",
+            font=("Arial", 24, "bold"),
+            text_color=self.text_color
+        ).pack(side="left")
+
+        self.clock_label = ctk.CTkLabel(
+            header,
             text="",
-            font=("Arial", 11),
-            bg=self.bg_color,
-            fg=self.muted_text
+            font=("Arial", 10),
+            text_color=self.muted_text
         )
-        self.clock_label.pack(pady=(0, 15))
+        self.clock_label.pack(side="right")
 
-        search_frame = tk.Frame(
-            self.main_container,
-            bg=self.card_color,
-            padx=20,
-            pady=15
-        )
-        search_frame.pack(pady=(0, 15))
+        search_frame = ctk.CTkFrame(self.page, fg_color=self.bg_color)
+        search_frame.pack(fill="x", pady=(0, 18))
 
-        self.city_entry = tk.Entry(
+        self.city_entry = ctk.CTkEntry(
             search_frame,
-            font=("Arial", 14),
-            width=34,
-            bg=self.input_color,
-            fg=self.text_color,
-            insertbackground=self.text_color,
-            relief="flat"
+            font=("Arial", 13),
+            height=38,
+            corner_radius=8,
+            fg_color=self.card_color,
+            text_color=self.text_color,
+            border_color=self.border_color
         )
-        self.city_entry.grid(row=0, column=0, padx=(0, 15), ipady=9)
+        self.city_entry.pack(side="left", fill="x", expand=True)
 
-        search_button = RoundedButton(
+        ctk.CTkButton(
             search_frame,
-            text="Get Weather",
+            text="🔍  Get Weather",
             command=self.search_weather,
-            bg_color=self.blue_color,
-            hover_color=self.accent_color,
             width=150,
-            height=45
+            height=38,
+            corner_radius=8,
+            fg_color=self.blue_color,
+            hover_color="#1D4ED8",
+            font=("Arial", 11, "bold")
+        ).pack(side="left", padx=(10, 0))
+
+        top_row = ctk.CTkFrame(self.page, fg_color=self.bg_color)
+        top_row.pack(fill="x", pady=(0, 12))
+
+        weather_card = self.create_card(top_row)
+        weather_card.pack(side="left", padx=(0, 10))
+        weather_card.configure(width=395, height=115)
+        weather_card.pack_propagate(False)
+
+        weather_content = ctk.CTkFrame(weather_card, fg_color=self.card_color)
+        weather_content.pack(padx=22, pady=18, fill="both")
+
+        self.weather_icon_label = ctk.CTkLabel(
+            weather_content,
+            text="☀",
+            font=("Arial", 42),
+            text_color=self.alert_text
         )
-        search_button.grid(row=0, column=1)
+        self.weather_icon_label.pack(side="left", padx=(0, 25))
 
-        main_frame = tk.Frame(self.main_container, bg=self.bg_color)
-        main_frame.pack()
+        weather_text_area = ctk.CTkFrame(weather_content, fg_color=self.card_color)
+        weather_text_area.pack(side="left", anchor="center")
 
-        left_column = tk.Frame(main_frame, bg=self.bg_color)
-        left_column.grid(row=0, column=0, padx=15, sticky="n")
+        temp_row = ctk.CTkFrame(weather_text_area, fg_color=self.card_color)
+        temp_row.pack(anchor="w")
 
-        middle_column = tk.Frame(main_frame, bg=self.bg_color)
-        middle_column.grid(row=0, column=1, padx=15, sticky="n")
-
-        right_column = tk.Frame(main_frame, bg=self.bg_color)
-        right_column.grid(row=0, column=2, padx=15, sticky="n")
-
-        weather_card = self.create_card(left_column, 330, 360)
-        self.create_section_title(weather_card, "Current Weather")
-
-        self.weather_icon_label = tk.Label(
-            weather_card,
-            text="🌍",
-            font=("Arial", 46),
-            bg=self.card_color,
-            fg=self.text_color
+        self.temp_label = ctk.CTkLabel(
+            temp_row,
+            text="--°C",
+            font=("Arial", 38, "bold"),
+            text_color=self.text_color
         )
-        self.weather_icon_label.pack(pady=(12, 0))
+        self.temp_label.pack(side="left")
 
-        self.temp_label = tk.Label(
-            weather_card,
-            text="-- °C",
-            font=("Arial", 34, "bold"),
-            bg=self.card_color,
-            fg="#38BDF8"
+        self.feels_label = ctk.CTkLabel(
+            temp_row,
+            text="",
+            font=("Arial", 12),
+            text_color=self.muted_text
         )
-        self.temp_label.pack(pady=(5, 0))
+        self.feels_label.pack(side="left", padx=(10, 0))
 
-        self.weather_label = tk.Label(
-            weather_card,
+        self.weather_label = ctk.CTkLabel(
+            weather_text_area,
             text="Search for a city to view weather.",
-            font=("Arial", 11),
-            bg=self.card_color,
-            fg=self.text_color,
-            justify="center",
-            wraplength=270
-        )
-        self.weather_label.pack(pady=(10, 0))
-
-        stats_card = self.create_card(left_column, 330, 180)
-        self.create_section_title(stats_card, "Statistics")
-
-        self.stats_label = tk.Label(
-            stats_card,
-            text="Searches: 0\nFavorites: 0\nAverage Temp: -- °C",
-            font=NORMAL_FONT,
-            bg=self.card_color,
-            fg=self.text_color,
+            font=("Arial", 12),
+            text_color=self.muted_text,
             justify="left"
         )
-        self.stats_label.pack(anchor="w", pady=(15, 0))
+        self.weather_label.pack(anchor="w", pady=(4, 0))
 
-        forecast_card = self.create_card(middle_column, 360, 450)
-        self.create_section_title(forecast_card, "5-Day Forecast")
+        alert_card = self.create_card(top_row, color=self.alert_bg)
+        alert_card.pack(side="left")
+        alert_card.configure(width=355, height=115)
+        alert_card.pack_propagate(False)
 
-        self.forecast_box = tk.Text(
-            forecast_card,
+        alert_content = ctk.CTkFrame(alert_card, fg_color=self.alert_bg)
+        alert_content.pack(padx=18, pady=20, fill="both")
+
+        ctk.CTkLabel(
+            alert_content,
+            text="⚠",
+            font=("Arial", 20),
+            text_color=self.alert_text
+        ).pack(side="left", padx=(0, 14), anchor="n")
+
+        alert_text_frame = ctk.CTkFrame(alert_content, fg_color=self.alert_bg)
+        alert_text_frame.pack(side="left", fill="both", expand=True)
+
+        self.alert_title_label = ctk.CTkLabel(
+            alert_text_frame,
+            text="Weather alert",
+            font=("Arial", 13, "bold"),
+            text_color=self.alert_text
+        )
+        self.alert_title_label.pack(anchor="w")
+
+        self.alert_label = ctk.CTkLabel(
+            alert_text_frame,
+            text="Search a city to see weather alerts.",
             font=("Arial", 11),
-            width=34,
-            height=23,
-            bg=self.card_color,
-            fg=self.text_color,
-            relief="flat",
-            wrap="word"
+            text_color=self.alert_text,
+            justify="left",
+            wraplength=260
         )
-        self.forecast_box.pack(anchor="w", pady=(18, 0))
-        self.forecast_box.insert(tk.END, "Forecast will appear here.")
-        self.forecast_box.config(state="disabled")
+        self.alert_label.pack(anchor="w", pady=(3, 0))
 
-        favorites_card = self.create_card(right_column, 330, 260)
-        self.create_section_title(favorites_card, "Favorite Cities")
+        stats_row = ctk.CTkFrame(self.page, fg_color=self.bg_color)
+        stats_row.pack(fill="x", pady=(0, 18))
 
-        tk.Label(
-            favorites_card,
-            text="Double-click a city to load weather.",
-            font=SMALL_FONT,
-            bg=self.card_color,
-            fg=self.muted_text
-        ).pack(anchor="w", pady=(3, 10))
+        self.searches_value = self.create_stat_card(stats_row, "Searches", "0")
+        self.favorites_value = self.create_stat_card(stats_row, "Favorites", "0")
+        self.avg_temp_value = self.create_stat_card(stats_row, "Average temp", "--°C")
+        self.comfort_value = self.create_stat_card(stats_row, "Comfort Score", "--")
 
-        self.favorites_listbox = tk.Listbox(
-            favorites_card,
-            font=("Arial", 12),
-            width=28,
-            height=7,
-            bg=self.input_color,
-            fg=self.text_color,
-            selectbackground=self.accent_color,
-            selectforeground="white",
-            relief="flat"
+        ctk.CTkLabel(
+            self.page,
+            text="5-day forecast",
+            font=("Arial", 16, "bold"),
+            text_color=self.text_color
+        ).pack(anchor="w", pady=(0, 8))
+
+        self.forecast_cards_frame = ctk.CTkFrame(self.page, fg_color=self.bg_color)
+        self.forecast_cards_frame.pack(fill="x", pady=(0, 18))
+
+        recommendation_card = self.create_card(self.page)
+        recommendation_card.pack(fill="x", pady=(0, 18))
+
+        self.recommendation_label = ctk.CTkLabel(
+            recommendation_card,
+            text="Search a city to get recommendations",
+            font=("Arial", 13, "bold"),
+            text_color=self.text_color
         )
-        self.favorites_listbox.pack(anchor="w")
-        self.favorites_listbox.bind("<Double-Button-1>", self.load_selected_favorite)
 
-        actions_card = self.create_card(right_column, 330, 330)
-        self.create_section_title(actions_card, "Actions")
-
-        tk.Frame(actions_card, bg=self.card_color, height=10).pack()
-
-        RoundedButton(
-            actions_card,
-            text="Add Current City",
-            command=self.add_current_city_to_favorites,
-            bg_color=self.blue_color,
-            hover_color=self.accent_color,
-            width=250,
-            height=42
-        ).pack(pady=6)
-
-        RoundedButton(
-            actions_card,
-            text="Remove Favorite",
-            command=self.remove_selected_favorite,
-            bg_color=self.red_color,
-            hover_color="#F87171",
-            width=250,
-            height=42
-        ).pack(pady=6)
-
-        RoundedButton(
-            actions_card,
-            text="Forecast Chart",
-            command=self.generate_chart,
-            bg_color=self.green_color,
-            hover_color="#34D399",
-            width=250,
-            height=42
-        ).pack(pady=6)
-
-        RoundedButton(
-            actions_card,
-            text="View Search History",
-            command=self.show_search_history,
-            bg_color="#7C3AED",
-            hover_color="#A78BFA",
-            width=250,
-            height=42
-        ).pack(pady=6)
-
-        footer_label = tk.Label(
-            self.main_container,
-            text="Data provided by OpenWeatherMap API | Search history is saved locally",
-            font=SMALL_FONT,
-            bg=self.bg_color,
-            fg=self.muted_text
+        self.recommendation_label.pack(
+            padx=20,
+            pady=15,
+            anchor="w"
         )
-        footer_label.pack(pady=(15, 25))
+
+        bottom_row = ctk.CTkFrame(self.page, fg_color=self.bg_color)
+        bottom_row.pack(fill="x")
+
+        favorites_section = ctk.CTkFrame(bottom_row, fg_color=self.bg_color)
+        favorites_section.pack(side="left", padx=(0, 14))
+
+        ctk.CTkLabel(
+            favorites_section,
+            text="Favorite cities",
+            font=("Arial", 16, "bold"),
+            text_color=self.text_color
+        ).pack(anchor="w", pady=(0, 8))
+
+        self.favorites_frame = self.create_card(favorites_section)
+        self.favorites_frame.pack()
+        self.favorites_frame.configure(width=355, height=210)
+        self.favorites_frame.pack_propagate(False)
+
+        actions_section = ctk.CTkFrame(bottom_row, fg_color=self.bg_color)
+        actions_section.pack(side="left", anchor="n")
+
+        ctk.CTkLabel(
+            actions_section,
+            text="Actions",
+            font=("Arial", 16, "bold"),
+            text_color=self.text_color
+        ).pack(anchor="w", pady=(0, 8))
+
+        actions_grid = ctk.CTkFrame(actions_section, fg_color=self.bg_color)
+        actions_grid.pack()
+
+        actions_grid.grid_columnconfigure(0, weight=1)
+        actions_grid.grid_columnconfigure(1, weight=1)
+
+        self.create_action_button(actions_grid, "☆  Add favorite", self.add_current_city_to_favorites, 0, 0)
+        self.create_action_button(actions_grid, "⌁  Chart", self.generate_chart, 0, 1)
+
+        self.create_action_button(actions_grid, "⟳  History", self.show_search_history, 1, 0)
+        self.create_action_button(actions_grid, "⚖  Compare cities", self.compare_cities, 1, 1)
+
+        self.create_action_button(actions_grid,"🌍 Climate Analyzer",self.climate_analyzer,2,0,2)
+
+        ctk.CTkLabel(
+            self.page,
+            text="Data provided by OpenWeatherMap API · Search history saved locally",
+            font=("Arial", 10),
+            text_color=self.muted_text
+        ).pack(pady=(18, 0))
 
         self.load_favorites_to_listbox()
         self.update_statistics()
+        self.show_empty_forecast()
+
+    def create_stat_card(self, parent, title, value):
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=self.soft_card,
+            corner_radius=10,
+            width=175,
+            height=82
+        )
+        card.pack(side="left", padx=(0, 12))
+        card.pack_propagate(False)
+
+        ctk.CTkLabel(
+            card,
+            text=title,
+            font=("Arial", 11),
+            text_color=self.muted_text
+        ).pack(anchor="w", padx=16, pady=(12, 0))
+
+        value_label = ctk.CTkLabel(
+            card,
+            text=value,
+            font=("Arial", 25, "bold"),
+            text_color=self.text_color
+        )
+        value_label.pack(anchor="w", padx=16, pady=(0, 10))
+
+        return value_label
+
+    def create_action_button(self, parent, text, command, row, column, colspan=1):
+        button = ctk.CTkButton(
+            parent,
+            text=text,
+            command=command,
+            height=38,
+            corner_radius=8,
+            fg_color=self.card_color,
+            hover_color=self.soft_card,
+            text_color=self.text_color,
+            border_width=1,
+            border_color=self.border_color,
+            font=("Arial", 11, "bold")
+        )
+
+        button.grid(
+            row=row,
+            column=column,
+            columnspan=colspan,
+            sticky="nsew",
+            padx=4,
+            pady=4
+        )
 
     def update_clock(self):
         current_time = datetime.now().strftime("%d %B %Y | %H:%M:%S")
-        self.clock_label.config(text=current_time)
+        self.clock_label.configure(text=current_time)
         self.window.after(1000, self.update_clock)
 
     def get_weather_emoji(self, condition):
         condition = condition.lower()
 
         if "clear" in condition:
-            return "☀️"
-        elif "cloud" in condition:
-            return "☁️"
-        elif "rain" in condition:
-            return "🌧️"
-        elif "snow" in condition:
-            return "❄️"
-        elif "storm" in condition or "thunder" in condition:
-            return "⛈️"
-        elif "mist" in condition or "fog" in condition or "haze" in condition:
-            return "🌫️"
-        else:
-            return "🌍"
+            return "☀"
+        if "cloud" in condition:
+            return "☁"
+        if "rain" in condition:
+            return "☔"
+        if "snow" in condition:
+            return "❄"
+        if "storm" in condition or "thunder" in condition:
+            return "⚡"
+        if "mist" in condition or "fog" in condition or "haze" in condition:
+            return "≋"
+        return "☁"
 
     def update_statistics(self):
         history = self.file_manager.load_weather_history()
@@ -344,7 +364,6 @@ class WeatherDashboardGUI:
 
         total_searches = len(history)
         total_favorites = len(favorites)
-
         avg_temp = "--"
 
         if history:
@@ -359,15 +378,12 @@ class WeatherDashboardGUI:
             if temperatures:
                 avg_temp = round(sum(temperatures) / len(temperatures), 1)
 
-        self.stats_label.config(
-            text=(
-                f"Searches: {total_searches}\n"
-                f"Favorites: {total_favorites}\n"
-                f"Average Temp: {avg_temp} °C"
-            )
-        )
+        self.searches_value.configure(text=str(total_searches))
+        self.favorites_value.configure(text=str(total_favorites))
+        self.avg_temp_value.configure(text=f"{avg_temp}°C")
 
     def search_weather(self):
+        placeholder_text = "Enter city name..."
         city = self.city_entry.get().strip()
 
         if city == "":
@@ -385,50 +401,148 @@ class WeatherDashboardGUI:
 
         self.current_city = data["city"]
 
-        self.weather_icon_label.config(
-            text=self.get_weather_emoji(data["condition"])
+        recommendation = self.generate_weather_recommendation(data)
+
+        self.recommendation_label.configure(
+            text=recommendation
         )
 
-        self.temp_label.config(
-            text=f"{data['temperature']} °C"
+        comfort = self.calculate_comfort_score(data)
+
+        self.comfort_value.configure(
+            text=f"{comfort}/100"
         )
+        if comfort >= 80:
+            rating = "Excellent ☀️"
+        elif comfort >= 60:
+            rating = "Good 🙂"
+        elif comfort >= 40:
+            rating = "Moderate 😐"
+        else:
+            rating = "Poor 🌧"
+
+        self.weather_icon_label.configure(text=self.get_weather_emoji(data["condition"]))
+        self.temp_label.configure(text=f"{data['temperature']}°C")
+        self.feels_label.configure(text=f"feels {data['feels_like']}°C")
 
         weather_text = (
-            f"📍 {data['city']}, {data['country']}\n\n"
-            f"🤔 Feels Like: {data['feels_like']} °C\n"
-            f"💧 Humidity: {data['humidity']} %\n"
-            f"☁ Condition: {data['condition'].title()}\n"
-            f"💨 Wind: {data['wind_speed']} m/s"
+            f"⌾ {data['city']}, {data['country']} · {data['condition'].title()}\n"
+            f"♢ {data['humidity']}%       ≋ {data['wind_speed']} m/s"
         )
+        self.weather_label.configure(text=weather_text)
 
-        self.weather_label.config(text=weather_text)
+        alerts = self.alert_manager.generate_alerts(data)
+
+        if alerts:
+            first_alert = alerts[0]
+            for symbol in ["🔥", "❄️", "💧", "💨", "☔", "🌨", "✅"]:
+                first_alert = first_alert.replace(symbol, "")
+
+            parts = first_alert.split(":", 1)
+
+            if len(parts) == 2:
+                self.alert_title_label.configure(text=f"Comfort: {rating}")
+                self.alert_label.configure(text=parts[1].strip())
+            else:
+                self.alert_title_label.configure(text="Weather alert")
+                self.alert_label.configure(text=first_alert.strip())
 
         self.file_manager.save_weather_data(data)
         self.show_forecast(city)
         self.update_statistics()
 
+    def show_empty_forecast(self):
+        for widget in self.forecast_cards_frame.winfo_children():
+            widget.destroy()
+
+        for index in range(5):
+            self.create_forecast_card("--", "☁", "--°C", "No data", index)
+
+    def create_forecast_card(self, date, icon, temp, condition, index):
+        self.forecast_cards_frame.grid_columnconfigure(index, weight=1, uniform="forecast")
+
+        card = ctk.CTkFrame(
+            self.forecast_cards_frame,
+            fg_color=self.card_color,
+            corner_radius=10,
+            border_width=1,
+            border_color=self.border_color
+        )
+        card.grid(row=0, column=index, padx=5, pady=4, sticky="nsew")
+
+        ctk.CTkLabel(card, text=date, font=("Arial", 10), text_color=self.muted_text).pack(pady=(8, 0))
+        ctk.CTkLabel(card, text=icon, font=("Arial", 24), text_color=self.blue_color).pack()
+        ctk.CTkLabel(card, text=temp, font=("Arial", 14, "bold"), text_color=self.text_color).pack()
+        ctk.CTkLabel(card, text=condition, font=("Arial", 10), text_color=self.text_color, wraplength=100).pack(pady=(0, 6))
+
     def show_forecast(self, city):
         forecast = self.weather_service.get_forecast(city)
         self.current_forecast = forecast
 
-        self.forecast_box.config(state="normal")
-        self.forecast_box.delete("1.0", tk.END)
+        for widget in self.forecast_cards_frame.winfo_children():
+            widget.destroy()
 
         if not forecast:
-            self.forecast_box.insert(tk.END, "Forecast data could not be found.")
-            self.forecast_box.config(state="disabled")
+            self.show_empty_forecast()
             return
 
-        for day in forecast:
-            forecast_text = (
-                f"📅 {day['date']}\n"
-                f"🌡 Temperature: {day['temperature']} °C\n"
-                f"☁ Condition: {day['condition'].title()}\n"
-                f"{'─' * 30}\n\n"
+        for index, day in enumerate(forecast[:5]):
+            self.create_forecast_card(
+                day["date"],
+                self.get_weather_emoji(day["condition"]),
+                f"{day['temperature']}°C",
+                day["condition"].title(),
+                index
             )
-            self.forecast_box.insert(tk.END, forecast_text)
 
-        self.forecast_box.config(state="disabled")
+    def load_favorites_to_listbox(self):
+        for widget in self.favorites_frame.winfo_children():
+            widget.destroy()
+
+        favorites = self.city_manager.load_favorites()
+
+        if not favorites:
+            ctk.CTkLabel(
+                self.favorites_frame,
+                text="No favorite cities yet.",
+                font=("Arial", 10),
+                text_color=self.muted_text
+            ).pack(anchor="w", padx=14, pady=12)
+            return
+
+        for city in favorites:
+            row = ctk.CTkFrame(self.favorites_frame, fg_color=self.card_color)
+            row.pack(fill="x", padx=14, pady=4)
+
+            city_label = ctk.CTkLabel(
+                row,
+                text=city,
+                font=("Arial", 12, "bold"),
+                text_color=self.text_color
+            )
+            city_label.pack(side="left")
+
+            city_label.bind(
+                "<Double-Button-1>",
+                lambda event, city_name=city: self.load_favorite_city(city_name)
+            )
+
+            ctk.CTkButton(
+                row,
+                text="×",
+                command=lambda city_name=city: self.remove_favorite_by_name(city_name),
+                width=24,
+                height=22,
+                corner_radius=6,
+                fg_color=self.card_color,
+                hover_color=self.soft_card,
+                text_color=self.muted_text
+            ).pack(side="right")
+
+    def load_favorite_city(self, city):
+        self.city_entry.delete(0, tk.END)
+        self.city_entry.insert(0, city)
+        self.display_weather_for_city(city)
 
     def add_current_city_to_favorites(self):
         if self.current_city is None:
@@ -439,63 +553,24 @@ class WeatherDashboardGUI:
         self.load_favorites_to_listbox()
         self.update_statistics()
 
+    def remove_selected_favorite(self):
         messagebox.showinfo(
-            "Favorite Added",
-            f"{self.current_city} added to favorites."
+            "Remove Favorite",
+            "Use the × button beside a city name to remove it."
         )
 
-    def remove_selected_favorite(self):
-        selected = self.favorites_listbox.curselection()
-
-        if not selected:
-            messagebox.showwarning("Remove Favorite", "Please select a favorite city.")
-            return
-
-        city = self.favorites_listbox.get(selected[0]).strip()
-
+    def remove_favorite_by_name(self, city):
         self.city_manager.remove_favorite_city(city)
         self.load_favorites_to_listbox()
         self.update_statistics()
 
-        messagebox.showinfo(
-            "Favorite Removed",
-            f"{city} removed successfully."
-        )
-
-    def load_favorites_to_listbox(self):
-        self.favorites_listbox.delete(0, tk.END)
-
-        favorites = self.city_manager.load_favorites()
-
-        for city in favorites:
-            self.favorites_listbox.insert(tk.END, f"  {city}")
-
-    def load_selected_favorite(self, event):
-        selected = self.favorites_listbox.curselection()
-
-        if not selected:
-            return
-
-        selected_city = self.favorites_listbox.get(selected[0]).strip()
-
-        self.city_entry.delete(0, tk.END)
-        self.city_entry.insert(0, selected_city)
-
-        self.display_weather_for_city(selected_city)
-
     def generate_chart(self):
         if self.current_city is None:
-            messagebox.showwarning(
-                "Chart Error",
-                "Please search for a city first."
-            )
+            messagebox.showwarning("Chart Error", "Please search for a city first.")
             return
 
         if not self.current_forecast:
-            messagebox.showwarning(
-                "Chart Error",
-                "Forecast data is not available yet."
-            )
+            messagebox.showwarning("Chart Error", "Forecast data is not available yet.")
             return
 
         chart_path = self.chart_generator.generate_forecast_chart(
@@ -504,18 +579,9 @@ class WeatherDashboardGUI:
         )
 
         if chart_path:
-            absolute_path = os.path.abspath(chart_path)
-            os.startfile(absolute_path)
-
-            messagebox.showinfo(
-                "Chart Generated",
-                f"Forecast chart generated successfully.\n\nSaved at:\n{absolute_path}"
-            )
+            os.startfile(os.path.abspath(chart_path))
         else:
-            messagebox.showerror(
-                "Chart Error",
-                "Chart could not be generated."
-            )
+            messagebox.showerror("Chart Error", "Chart could not be generated.")
 
     def show_search_history(self):
         history = self.file_manager.load_weather_history()
@@ -524,19 +590,17 @@ class WeatherDashboardGUI:
             messagebox.showinfo("Search History", "No weather history found.")
             return
 
-        history_window = tk.Toplevel(self.window)
+        history_window = ctk.CTkToplevel(self.window)
         history_window.title("Search History")
         history_window.geometry("700x480")
-        history_window.config(bg=self.bg_color)
+        history_window.configure(fg_color=self.bg_color)
 
-        title_label = tk.Label(
+        ctk.CTkLabel(
             history_window,
             text="Search History",
             font=("Arial", 22, "bold"),
-            bg=self.bg_color,
-            fg=self.text_color
-        )
-        title_label.pack(pady=15)
+            text_color=self.text_color
+        ).pack(pady=15)
 
         history_box = tk.Text(
             history_window,
@@ -551,21 +615,313 @@ class WeatherDashboardGUI:
         )
         history_box.pack(pady=10)
 
-        header = f"{'Date':<22}{'City':<18}{'Temperature'}\n"
-        separator = "-" * 58 + "\n"
-
-        history_box.insert(tk.END, header)
-        history_box.insert(tk.END, separator)
+        history_box.insert(tk.END, f"{'Date':<22}{'City':<18}{'Temperature'}\n")
+        history_box.insert(tk.END, "-" * 58 + "\n")
 
         for row in history:
-            line = (
-                f"{row['Date']:<22}"
-                f"{row['City']:<18}"
-                f"{row['Temperature']} °C\n"
+            history_box.insert(
+                tk.END,
+                f"{row['Date']:<22}{row['City']:<18}{row['Temperature']} °C\n"
             )
-            history_box.insert(tk.END, line)
 
         history_box.config(state="disabled")
+
+    def compare_cities(self):
+        city_input = self.city_entry.get().strip()
+
+        if not city_input:
+            messagebox.showwarning(
+                "Compare Cities",
+                "Enter cities separated by commas.\nExample: Berlin, London, Paris"
+            )
+            return
+
+        city_names = [city.strip() for city in city_input.split(",")]
+
+        if len(city_names) < 2:
+            messagebox.showwarning("Compare Cities", "Please enter at least two cities.")
+            return
+
+        cities_data = []
+
+        for city in city_names:
+            data = self.weather_service.get_weather(city)
+
+            if data:
+                cities_data.append(data)
+
+        if len(cities_data) < 2:
+            messagebox.showerror("Compare Cities", "Could not retrieve enough city data.")
+            return
+
+        hottest = self.city_comparison.find_hottest_city(cities_data)
+        coldest = self.city_comparison.find_coldest_city(cities_data)
+
+        result = ""
+
+        for city in cities_data:
+            result += f"{city['city']}: {city['temperature']} °C\n"
+
+        result += f"\n🔥 Hottest: {hottest['city']} ({hottest['temperature']} °C)\n"
+        result += f"❄ Coldest: {coldest['city']} ({coldest['temperature']} °C)"
+
+        messagebox.showinfo("Weather Comparison", result)
+
+    def calculate_comfort_score(self, data):
+
+        temp = float(data["temperature"])
+        humidity = float(data["humidity"])
+        wind = float(data["wind_speed"])
+
+        score = 100
+
+        score -= abs(temp - 22) * 2
+        score -= humidity * 0.15
+        score -= wind * 1.5
+
+        score = max(0, min(100, round(score)))
+
+        return score
+
+    def analyze_country(self, csv_path, country_name):
+
+        cities = []
+
+        with open(csv_path, newline="", encoding="utf-8") as file:
+
+            reader = csv.DictReader(file)
+
+            for row in reader:
+                cities.append(row["City"])
+
+        results = []
+
+        for city in cities:
+
+            data = self.weather_service.get_weather(city)
+
+            if data:
+                results.append(
+                    (
+                        city,
+                        float(data["temperature"])
+                    )
+                )
+
+        if not results:
+            messagebox.showerror(
+                "Climate Analyzer",
+                "No weather data available."
+            )
+            return
+
+        results.sort(
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        hottest = results[0]
+        coldest = results[-1]
+
+        avg_temp = round(
+            sum(temp for _, temp in results) / len(results),
+            1
+        )
+
+        spread = round(
+            hottest[1] - coldest[1],
+            1
+        )
+
+        result_window = ctk.CTkToplevel(self.window)
+        result_window.title(f"{country_name} Climate Analysis")
+        result_window.geometry("600x550")
+        result_window.configure(fg_color=self.bg_color)
+
+        title = ctk.CTkLabel(
+            result_window,
+            text=f"🌍 {country_name} Climate Analysis",
+            font=("Arial", 22, "bold")
+        )
+        title.pack(pady=15)
+
+        summary = (
+            f"Average Temperature: {avg_temp}°C\n"
+            f"🔥 Hottest City: {hottest[0]} ({hottest[1]}°C)\n"
+            f"❄ Coldest City: {coldest[0]} ({coldest[1]}°C)\n"
+            f"📊 Temperature Spread: {spread}°C"
+        )
+
+        summary_label = ctk.CTkLabel(
+            result_window,
+            text=summary,
+            font=("Arial", 13),
+            justify="left"
+        )
+        summary_label.pack(pady=10)
+
+        ranking_frame = ctk.CTkFrame(
+            result_window,
+            corner_radius=10
+        )
+        ranking_frame.pack(
+            fill="both",
+            expand=True,
+            padx=20,
+            pady=10
+        )
+
+        ranking_text = tk.Text(
+            ranking_frame,
+            font=("Consolas", 12),
+            relief="flat",
+            padx=10,
+            pady=10
+        )
+
+        ranking_text.pack(
+            fill="both",
+            expand=True,
+            padx=10,
+            pady=10
+        )
+
+        ranking_text.insert(
+            tk.END,
+            f"{'Rank':<6}{'City':<20}{'Temp'}\n"
+        )
+
+        ranking_text.insert(
+            tk.END,
+            "-" * 40 + "\n"
+        )
+
+        for rank, (city, temp) in enumerate(results, start=1):
+            ranking_text.insert(
+                tk.END,
+                f"{rank:<6}{city:<20}{temp}°C\n"
+            )
+
+        ranking_text.config(state="disabled")
+
+    def climate_analyzer(self):
+
+        popup = ctk.CTkToplevel(self.window)
+        popup.title("🌍 Climate Analyzer")
+        popup.geometry("400x280")
+        popup.resizable(False, False)
+
+        ctk.CTkLabel(
+            popup,
+            text="Climate Analyzer",
+            font=("Arial", 18, "bold")
+        ).pack(pady=(15, 15))
+
+        ctk.CTkLabel(
+            popup,
+            text="Select Continent"
+        ).pack()
+
+        continent_dropdown = ctk.CTkComboBox(
+            popup,
+            values=["Europe", "Asia", "Africa"]
+        )
+        continent_dropdown.pack(pady=5)
+
+        ctk.CTkLabel(
+            popup,
+            text="Select Country"
+        ).pack(pady=(15, 0))
+
+        country_dropdown = ctk.CTkComboBox(
+            popup,
+            values=["Germany", "France", "Italy","Spain"]
+        )
+        country_dropdown.pack(pady=5)
+
+        def update_countries(choice):
+
+            if choice == "Europe":
+                country_dropdown.configure(
+                    values=["Germany", "France", "Italy","Spain"]
+                )
+                country_dropdown.set("Germany")
+
+            elif choice == "Asia":
+                country_dropdown.configure(
+                    values=["India", "Japan", "China"]
+                )
+                country_dropdown.set("India")
+
+            elif choice == "Africa":
+                country_dropdown.configure(
+                    values=["Egypt", "Nigeria", "South Africa"]
+                )
+                country_dropdown.set("Egypt")
+
+        continent_dropdown.configure(
+            command=update_countries
+        )
+
+        continent_dropdown.set("Europe")
+        country_dropdown.set("Germany")
+
+        def run_analysis():
+
+            continent = continent_dropdown.get().lower()
+            country = country_dropdown.get().lower().replace(" ", "_")
+
+            csv_path = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)),
+                "data",
+                continent,
+                f"{country}.csv"
+            )
+
+            if not os.path.exists(csv_path):
+                messagebox.showerror(
+                    "File Error",
+                    f"Dataset not found:\n{csv_path}"
+                )
+                return
+
+            popup.destroy()
+
+            self.analyze_country(
+                csv_path,
+                country.title()
+            )
+
+        ctk.CTkButton(
+            popup,
+            text="Analyze",
+            command=run_analysis,
+            width=150,
+            height=40
+        ).pack(pady=25)
+
+
+
+    def generate_weather_recommendation(self, data):
+
+        temp = float(data["temperature"])
+        humidity = float(data["humidity"])
+        wind = float(data["wind_speed"])
+        condition = data["condition"].lower()
+
+        if "rain" in condition:
+            return "🌧 Carry an umbrella"
+
+        if temp < 5:
+            return "❄ Wear warm clothes"
+
+        if wind > 10:
+            return "💨 Strong winds expected"
+
+        if temp > 25:
+            return "☀ Great day for outdoor activities"
+
+        return "🙂 Pleasant weather today"
 
     def run(self):
         self.window.mainloop()
