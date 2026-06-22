@@ -95,22 +95,38 @@ Features:
 WeatherDashboardPro/
 │
 ├── data/
+│   ├── Africa/
+│   ├── Asia/
 │   ├── europe/
-│   ├── asia/
-│   └── africa/
+│   ├── favorites.json
+│   └── weather_history.csv
 │
 ├── src/
-│   ├── gui.py
-│   ├── weather_service.py
-│   ├── city_manager.py
+│   ├── charts/
+│   │   └── forecast_temperature_chart.png
+│   │
+│   ├── logs/
+│   │   └── error.log
+│   │
+│   ├── utils/
+│   │   └── exception_handler.py
+│   │
+│   ├── alert_manager.py
 │   ├── chart_generator.py
+│   ├── city_comparison.py
+│   ├── city_manager.py
 │   ├── file_manager.py
-│   └── main.py
+│   ├── gui.py
+│   ├── main.py
+│   ├── rounded_button.py
+│   ├── theme.py
+│   └── weather_service.py
 │
-├── charts/
-├── logs/
-├── README.md
-└── requirements.txt
+├── .env
+├── .gitignore
+└── README.md
+```
+
 ```
 
 ---
