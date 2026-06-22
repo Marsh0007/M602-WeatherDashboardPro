@@ -127,8 +127,6 @@ WeatherDashboardPro/
 └── README.md
 ```
 
-```
-
 ---
 
 ## Installation
